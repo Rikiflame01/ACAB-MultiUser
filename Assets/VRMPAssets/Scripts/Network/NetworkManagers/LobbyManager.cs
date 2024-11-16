@@ -10,6 +10,8 @@ using Unity.Netcode.Transports.UTP;
 using Unity.XR.CoreUtils.Bindings.Variables;
 using Unity.Services.Authentication;
 using UnityEngine.SceneManagement;
+using Unity.Networking.Transport.Relay;
+using Unity.Services.Relay.Models;
 
 namespace XRMultiplayer
 {
@@ -210,7 +212,7 @@ namespace XRMultiplayer
                 m_HeartBeatRoutine = StartCoroutine(LobbyHeartbeatCoroutine(lobby.Id));
 
                 //Populate the transport data with the relay info for the host (IP, port, etc...)
-                m_Transport.SetHostRelayData(alloc.RelayServer.IpV4, (ushort)alloc.RelayServer.Port, alloc.AllocationIdBytes, alloc.Key, alloc.ConnectionData);
+                SetHostRelayData(alloc);
                 ConnectedToLobby(lobby);
 
                 return lobby;
@@ -231,12 +233,22 @@ namespace XRMultiplayer
             // Get the Join Allocation for the lobby based on the key
             var alloc = await RelayService.Instance.JoinAllocationAsync(lobby.Data[k_JoinCodeKeyIdentifier].Value);
             // Set the transport client data (IP, port, etc..)
-            m_Transport.SetClientRelayData
-            (
-                alloc.RelayServer.IpV4, (ushort)alloc.RelayServer.Port,
-                alloc.AllocationIdBytes, alloc.Key, alloc.ConnectionData, alloc.HostConnectionData
-            );
+            SetClientRelayData(alloc);
             return;
+        }
+
+        void SetHostRelayData(Allocation allocation)
+        {
+            RelayServerData relayServerData = new RelayServerData(allocation, "wss");
+            m_Transport.UseWebSockets = true;
+            m_Transport.SetRelayServerData(relayServerData);
+        }
+        
+        void SetClientRelayData(JoinAllocation joinAllocation)
+        {
+            RelayServerData relayServerData = new RelayServerData(joinAllocation, "wss");
+            m_Transport.UseWebSockets = true;
+            m_Transport.SetRelayServerData(relayServerData);
         }
 
         QuickJoinLobbyOptions GetQuickJoinFilterOptions()

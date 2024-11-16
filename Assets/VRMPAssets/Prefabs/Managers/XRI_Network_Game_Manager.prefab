@@ -28,13 +28,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8647664954492677990}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: -2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2491505289137730051
 MonoBehaviour:
@@ -50,6 +50,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   GlobalObjectIdHash: 2613208351
   InScenePlacedSourceGlobalObjectIdHash: 2613208351
+  DeferredDespawnTick: 0
+  Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
   ActiveSceneSynchronization: 0
@@ -57,6 +59,8 @@ MonoBehaviour:
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &1149903581173863409
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -69,8 +73,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ad97d272b98331644876b2289d56dd4a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
   m_AutoConnectOnLobbyJoin: 1
-  positionalVoiceChat: 1
+  positionalVoiceChat: 0
 --- !u!114 &2808410049059023866
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -118,5 +123,3 @@ MonoBehaviour:
   m_AudioFadeModel: 3
   m_MinMaxVoiceOutputVolume: {x: -10, y: 10}
   m_MinMaxVoiceInputVolume: {x: -10, y: 10}
-  m_ReconnectTime: 3
-  m_CheckForAutoReconnect: 0

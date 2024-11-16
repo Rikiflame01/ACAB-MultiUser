@@ -1,7 +1,6 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using WebSocketSharp;
 
 namespace XRMultiplayer
 {
@@ -56,7 +55,7 @@ namespace XRMultiplayer
 
         void UpdateName(string newName)
         {
-            if (!newName.IsNullOrEmpty())
+            if (!string.IsNullOrEmpty(newName))
             {
                 string playerName = newName;
                 if (m_Player.IsLocalPlayer)

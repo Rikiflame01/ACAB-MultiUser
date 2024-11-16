@@ -2186,6 +2186,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 792718839110796844, guid: e7a58ef30a96fb845b50778e16448078,
         type: 3}
+      propertyPath: m_Url
+      value: StreamingAssets\Whack_A_Pig_Minigame_Onboarding_Video.mp4
+      objectReference: {fileID: 0}
+    - target: {fileID: 792718839110796844, guid: e7a58ef30a96fb845b50778e16448078,
+        type: 3}
       propertyPath: m_VideoClip
       value: 
       objectReference: {fileID: 32900000, guid: 0ad99624b7c4f644e832c3dcafbbb589,

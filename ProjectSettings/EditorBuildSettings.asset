@@ -12,7 +12,10 @@ EditorBuildSettings:
     path: Assets/Scenes/BasicScene.unity
     guid: bc761d9a86b33554f85fd11bb1f87ba3
   m_configObjects:
+    com.unity.input.settings: {fileID: 11400000, guid: f4309b1a90306064492c9134832bfdf7,
+      type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: e3aee76b9372917449aef639e2f74814,
       type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 87b413c5a910b15498a98200731b1754,
       type: 2}
+  m_UseUCBPForAssetBundles: 0

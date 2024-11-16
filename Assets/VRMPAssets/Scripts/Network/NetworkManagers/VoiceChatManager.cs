@@ -301,9 +301,18 @@ namespace XRMultiplayer
         {
             if (NetworkManager.Singleton.IsConnectedClient & !m_ConnectedToRoom)
             {
-                Channel3DProperties properties = new(AudibleDistance, ConversationalDistance, AudioFadeIntensity, AudioFadeModel);
-                Utils.Log($"{k_DebugPrepend}Joining Voice Channel: {m_CurrentLobbyId}, properties: {properties}");
-                await VivoxService.Instance.JoinPositionalChannelAsync(m_CurrentLobbyId, m_ChatCapability, properties);
+                if (XRINetworkGameManager.Instance.positionalVoiceChat)
+                {
+                    Channel3DProperties properties = new(AudibleDistance, ConversationalDistance, AudioFadeIntensity, AudioFadeModel);
+                    Utils.Log($"{k_DebugPrepend}Joining Voice Channel: {m_CurrentLobbyId}, properties: {properties}");
+                    await VivoxService.Instance.JoinPositionalChannelAsync(m_CurrentLobbyId, m_ChatCapability, properties);
+                }
+                else
+                {
+                    ChannelOptions channelOptions = new ChannelOptions();
+                    channelOptions.MakeActiveChannelUponJoining = true;
+                    await VivoxService.Instance.JoinGroupChannelAsync(m_CurrentLobbyId, m_ChatCapability, channelOptions);
+                }
 
                 // Once connecting, make sure we are still in the game session, if not, disconnect from the voice chat.
                 if (!NetworkManager.Singleton.IsConnectedClient)
