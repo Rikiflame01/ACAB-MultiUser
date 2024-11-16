@@ -1,6 +1,17 @@
 # Unity WebXR Multiplayer Template
 Unity WebXR Multiplayer Template, based on Unity VR Multiplayer Template.
 
+## 📄 How to run the project
+
+- Clone the repository.
+- Open the project using a supported Unity version and Web as the build platform.
+- Set Unity Cloud ID for the project, check that the Vivox voice chat service is also set.
+- Build the project.
+- Run the build on HTTPS server.
+- Run instance of the project in the Editor or in Desktop build.
+- Open a room in the Editor or in Desktop build.
+- Now you can join the room from a web browser.
+
 ## 🧩 Compatibility
 
 **Important notice** regarding this Git repository - This repository use Symlinks. make sure that Symlinks are enabled when you clone.
