@@ -19,6 +19,7 @@ The intention of this repository is to be a starter kit for multiplayer WebXR ro
 - Streamlined way to deploy headless version to Unity Multiplay Hosting.
 - Setting room creator from web as host.
 - Using Addressables to load different parts (like minigames) only when needed.
+- Performance optimizations. (Currently needs Desktop PC to run well)
 
 This repository is meant to use Unity's services. Other multiplayer and voice-chat solutions might be better, but implementing them would be more appropriate in a fork.
 
