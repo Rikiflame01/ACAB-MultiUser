@@ -5031,11 +5031,6 @@ PrefabInstance:
       propertyPath: m_CullingMask.m_Bits
       value: 119
       objectReference: {fileID: 0}
-    - target: {fileID: 657184242161839408, guid: d6878e1999eb4b44a9f5a263af86c185,
-        type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 657184242222895506, guid: d6878e1999eb4b44a9f5a263af86c185,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -5075,16 +5070,6 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Layer
       value: 6
-      objectReference: {fileID: 0}
-    - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185,
-        type: 3}
-      propertyPath: m_CameraYOffset
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185,
-        type: 3}
-      propertyPath: m_RequestedTrackingOriginMode
-      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 2006588914225252831, guid: d6878e1999eb4b44a9f5a263af86c185,
         type: 3}
