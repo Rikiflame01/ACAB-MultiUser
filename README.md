@@ -1,5 +1,8 @@
-# Unity WebXR Multiplayer Template
+#This is a modified fork from Unity WebXR Multiplayer Template by De Panther, please check him out and follow him on social media!
+
 Unity WebXR Multiplayer Template, based on Unity VR Multiplayer Template.
+
+#I've adapted this repository to fit the needs of a project that I am working on.
 
 ## 📄 How to run the project
 
