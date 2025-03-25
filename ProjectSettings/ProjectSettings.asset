@@ -966,11 +966,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 1
   windowsGamepadBackendHint: 0
-  cloudProjectId: 
+  cloudProjectId: d2562ac8-1101-48b5-bfda-1c582f58d497
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: XRMPT
-  organizationId: 
+  projectName: webxr-multiplayer-template
+  organizationId: all-caps-are-beautiful
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
