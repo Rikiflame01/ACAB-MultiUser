@@ -9,8 +9,11 @@ EditorBuildSettings:
     path: Assets/Scenes/SampleScene.unity
     guid: 13f6f87036926f94ab0417ca1b31725c
   - enabled: 1
-    path: Assets/Scenes/BasicScene.unity
+    path: Assets/Scenes/BasicSceneWorking.unity
     guid: bc761d9a86b33554f85fd11bb1f87ba3
+  - enabled: 1
+    path: Assets/Scenes/BasicScene.unity
+    guid: 5346ae461b763a14ca45f1610c71357d
   m_configObjects:
     WebXR.Settings: {fileID: 11400000, guid: 8ec66a64bd90fab4ba68747c5468a96a, type: 2}
     com.unity.input.settings: {fileID: 11400000, guid: f4309b1a90306064492c9134832bfdf7,
