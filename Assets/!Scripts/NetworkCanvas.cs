@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
+using System.Linq;
 
 public class NetworkCanvas : NetworkBehaviour
 {
@@ -27,16 +28,24 @@ public class NetworkCanvas : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void PaintServerRpc(Vector2 uv, Color color, int brushSize)
+    public void PaintServerRpc(Vector2 uv, Color color, int brushSize, ulong senderClientId)
     {
-        // Broadcast painting action to all clients
-        PaintClientRpc(uv, color, brushSize);
+        // Broadcast the paint action to all clients except the sender
+        var targetClientIds = NetworkManager.Singleton.ConnectedClientsIds.Where(id => id != senderClientId).ToArray();
+        PaintClientRpc(uv, color, brushSize, new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = targetClientIds }
+        });
     }
 
     [ClientRpc]
-    private void PaintClientRpc(Vector2 uv, Color color, int brushSize)
+    private void PaintClientRpc(Vector2 uv, Color color, int brushSize, ClientRpcParams clientRpcParams)
     {
-        // Apply painting locally on all clients
+        ApplyPaintLocally(uv, color, brushSize);
+    }
+
+    public void ApplyPaintLocally(Vector2 uv, Color color, int brushSize)
+    {
         int x = (int)(uv.x * sharedTexture.width);
         int y = (int)(uv.y * sharedTexture.height);
         for (int i = -brushSize; i <= brushSize; i++)
@@ -54,7 +63,6 @@ public class NetworkCanvas : NetworkBehaviour
         sharedTexture.Apply();
     }
 
-    // Rest of the script (SyncTextureToClient, SyncTextureChunkClientRpc, textureBuffer) remains unchanged
     public void SyncTextureToClient(ulong clientId)
     {
         if (!IsServer) return;

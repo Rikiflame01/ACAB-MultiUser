@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
 public class CanvasRaycast : MonoBehaviour
 {
@@ -55,7 +56,11 @@ public class CanvasRaycast : MonoBehaviour
             NetworkCanvas networkCanvas = hit.collider.GetComponent<NetworkCanvas>();
             if (networkCanvas != null)
             {
-                networkCanvas.PaintServerRpc(hit.textureCoord, markColor, (int)markSize);
+                // Apply paint locally first for immediate feedback
+                networkCanvas.ApplyPaintLocally(hit.textureCoord, markColor, (int)markSize);
+                // Send the paint action to the server with the local client ID
+                ulong clientId = NetworkManager.Singleton.LocalClientId;
+                networkCanvas.PaintServerRpc(hit.textureCoord, markColor, (int)markSize, clientId);
             }
             else
             {
