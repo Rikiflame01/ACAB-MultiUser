@@ -643,6 +643,14 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 107785910}
+    - targetCorrespondingSourceObject: {fileID: 6689992741278781415, guid: 3549fdaf258e11846b85a316c16c699c,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 107785915}
+    - targetCorrespondingSourceObject: {fileID: 6689992741278781415, guid: 3549fdaf258e11846b85a316c16c699c,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 107785914}
   m_SourcePrefab: {fileID: 100100000, guid: 3549fdaf258e11846b85a316c16c699c, type: 3}
 --- !u!1 &107785908 stripped
 GameObject:
@@ -700,6 +708,69 @@ MonoBehaviour:
   previewScaleMultiplier: 0.001
   useAutomaticScaling: 1
   debugScaling: 0
+  isGraffitiCanEquipped: 0
+  requireEquipmentForRaycast: 1
+--- !u!114 &107785914
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 107785908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb7ceff67d8e08e4d8ac6508cca2a076, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enableDebugLogs: 1
+--- !u!114 &107785915
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 107785908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e06144dec2dcce44ea74dc2ee951a4f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+  m_AllowOverrideOwnership: 0
+  m_InteractionCheckTime: 2
+  m_IgnoreSocketSelectedCallback: 1
+  m_ResetObjectOnDisconnect: 1
+  m_RelinquishOwnershipAfterTime: 1
+  m_RelinquishOwnershipTime: 5
+  m_UseInteractingChangedEvent: 0
+  OnInteractingChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_SyncHover: 0
+  m_UseHoverEvents: 0
+  HoverNetworkedEventServer:
+    m_PersistentCalls:
+      m_Calls: []
+  HoverNetworkedEventAll:
+    m_PersistentCalls:
+      m_Calls: []
+  m_SyncSelect: 1
+  m_UseSelectEvents: 0
+  SelectNetworkedEventServer:
+    m_PersistentCalls:
+      m_Calls: []
+  SelectNetworkedEventAll:
+    m_PersistentCalls:
+      m_Calls: []
+  m_SyncActivate: 1
+  m_UseActivateEvents: 0
+  ActivateNetworkedEventServer:
+    m_PersistentCalls:
+      m_Calls: []
+  ActivateNetworkedEventAll:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FoldoutValues: 010101
 --- !u!1 &118778476
 GameObject:
   m_ObjectHideFlags: 0
@@ -1875,7 +1946,7 @@ PrefabInstance:
     - target: {fileID: 4234064996909593292, guid: 77ac6b10722bcca4a8baf70e44d89e78,
         type: 3}
       propertyPath: m_SmoothMotionEnabled
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4293411706219940244, guid: 77ac6b10722bcca4a8baf70e44d89e78,
         type: 3}

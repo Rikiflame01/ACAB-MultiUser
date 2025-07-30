@@ -23,6 +23,10 @@ public class CanvasRaycast : MonoBehaviour
     [SerializeField] private bool useAutomaticScaling = true; // Use automatic pixel-to-world calculation
     [SerializeField] private bool debugScaling = false; // Show debug info for scaling
 
+    [Header("Equipment State")]
+    [SerializeField] private bool isGraffitiCanEquipped = false; // Whether the graffiti can is currently equipped/grabbed
+    [SerializeField] private bool requireEquipmentForRaycast = true; // Whether to require equipment for any functionality
+
     private LineRenderer continuousLine;
     private GameObject previewDecal; // Changed from previewCircle to previewDecal
     private MeshRenderer previewRenderer;
@@ -52,6 +56,17 @@ public class CanvasRaycast : MonoBehaviour
 
     void Update()
     {
+        // Early exit if graffiti can is not equipped and we require equipment
+        if (requireEquipmentForRaycast && !isGraffitiCanEquipped)
+        {
+            // Hide any existing preview and disable line when not equipped
+            HideCanvasPreview();
+            continuousLine.enabled = false;
+            isAimingAtCanvas = false;
+            currentTargetCanvas = null;
+            return;
+        }
+
         bool isEquipped = selectActionReference?.action?.IsPressed() ?? false;
         continuousLine.enabled = isEquipped;
 
@@ -385,6 +400,42 @@ public class CanvasRaycast : MonoBehaviour
     }
 
     /// <summary>
+    /// Equipment state management - call these from VR interaction systems
+    /// </summary>
+    public void OnGraffitiCanEquipped()
+    {
+        isGraffitiCanEquipped = true;
+        Debug.Log("Graffiti can equipped - raycast and preview enabled");
+    }
+
+    public void OnGraffitiCanUnequipped()
+    {
+        isGraffitiCanEquipped = false;
+        // Immediately hide any active preview when unequipped
+        HideCanvasPreview();
+        isAimingAtCanvas = false;
+        currentTargetCanvas = null;
+        Debug.Log("Graffiti can unequipped - raycast and preview disabled");
+    }
+
+    /// <summary>
+    /// Check if graffiti can is currently equipped
+    /// </summary>
+    public bool IsGraffitiCanEquipped()
+    {
+        return isGraffitiCanEquipped;
+    }
+
+    /// <summary>
+    /// Toggle whether equipment is required for functionality (useful for testing)
+    /// </summary>
+    public void SetRequireEquipment(bool required)
+    {
+        requireEquipmentForRaycast = required;
+        Debug.Log($"Require equipment for raycast: {required}");
+    }
+
+    /// <summary>
     /// Enable or disable automatic scaling calculation
     /// </summary>
     public void SetAutomaticScaling(bool enabled)
@@ -452,11 +503,30 @@ public class CanvasRaycast : MonoBehaviour
     }
 
     /// <summary>
+    /// Test equipment state controls
+    /// </summary>
+    [ContextMenu("Test Equip Graffiti Can")]
+    public void TestEquipGraffitiCan()
+    {
+        OnGraffitiCanEquipped();
+    }
+
+    [ContextMenu("Test Unequip Graffiti Can")]
+    public void TestUnequipGraffitiCan()
+    {
+        OnGraffitiCanUnequipped();
+    }
+
+    /// <summary>
     /// Check if preview system is properly initialized
     /// </summary>
     [ContextMenu("Debug Preview Status")]
     public void DebugPreviewStatus()
     {
+        Debug.Log($"=== EQUIPMENT STATE ===");
+        Debug.Log($"Graffiti Can Equipped: {isGraffitiCanEquipped}");
+        Debug.Log($"Require Equipment: {requireEquipmentForRaycast}");
+        Debug.Log($"=== PREVIEW STATE ===");
         Debug.Log($"Show Preview: {showPreview}");
         Debug.Log($"Current target canvas: {currentTargetCanvas != null}");
         Debug.Log($"Is aiming at canvas: {isAimingAtCanvas}");
