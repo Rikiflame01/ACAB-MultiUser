@@ -280,4 +280,20 @@ public class NetworkCanvas : NetworkBehaviour
     }
 
     private byte[] textureBuffer;
+
+    /// <summary>
+    /// Public method to get the current canvas texture for saving purposes
+    /// </summary>
+    public Texture2D GetCanvasTexture()
+    {
+        return sharedTexture;
+    }
+
+    /// <summary>
+    /// Public method to check if the canvas is initialized
+    /// </summary>
+    public bool IsCanvasInitialized()
+    {
+        return isInitialized && sharedTexture != null;
+    }
 }
