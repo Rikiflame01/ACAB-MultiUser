@@ -30,25 +30,63 @@ public class NetworkCanvas : NetworkBehaviour
     {
         if (isInitialized) return;
 
-        // Initialize texture
+        // Initialize texture with transparent pixels
         sharedTexture = new Texture2D(1028, 1028, TextureFormat.RGBA32, false);
         Color[] pixels = new Color[1028 * 1028];
-        for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.white;
+        // Initialize with transparent pixels instead of white
+        for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.clear;
         sharedTexture.SetPixels(pixels);
         sharedTexture.Apply();
         
-        // Apply texture to material
+        // Apply texture to material and configure for transparency
         if (canvasMaterial != null)
         {
-            canvasMaterial.mainTexture = sharedTexture;
+            // Create a new material instance to avoid modifying the original asset
+            Material materialInstance = new Material(canvasMaterial);
+            materialInstance.mainTexture = sharedTexture;
+            
+            // Configure material for transparency
+            ConfigureMaterialForTransparency(materialInstance);
+            
             var meshRenderer = GetComponent<MeshRenderer>();
             if (meshRenderer != null)
             {
-                meshRenderer.material = canvasMaterial;
+                meshRenderer.material = materialInstance;
             }
         }
 
         isInitialized = true;
+    }
+
+    private void ConfigureMaterialForTransparency(Material material)
+    {
+        // Set rendering mode to transparent
+        if (material.HasProperty("_Mode"))
+        {
+            material.SetFloat("_Mode", 3); // Transparent mode
+        }
+        
+        // Enable alpha blending
+        if (material.HasProperty("_SrcBlend"))
+        {
+            material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        }
+        if (material.HasProperty("_DstBlend"))
+        {
+            material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        }
+        if (material.HasProperty("_ZWrite"))
+        {
+            material.SetFloat("_ZWrite", 0); // Disable Z-write for transparency
+        }
+        
+        // Set render queue for transparency
+        material.renderQueue = 3000; // Transparent queue
+        
+        // Enable keywords for transparency
+        material.EnableKeyword("_ALPHABLEND_ON");
+        material.DisableKeyword("_ALPHATEST_ON");
+        material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
     }
 
     /// <summary>
@@ -126,6 +164,71 @@ public class NetworkCanvas : NetworkBehaviour
                 }
             }
         }
+        sharedTexture.Apply();
+    }
+
+    /// <summary>
+    /// Clears the entire canvas by resetting all pixels to transparent
+    /// </summary>
+    public void ClearCanvas()
+    {
+        if (sharedTexture == null)
+        {
+            InitializeCanvas();
+            return;
+        }
+
+        // Reset all pixels to transparent
+        Color[] pixels = new Color[sharedTexture.width * sharedTexture.height];
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            pixels[i] = Color.clear;
+        }
+        
+        sharedTexture.SetPixels(pixels);
+        sharedTexture.Apply();
+
+        // If in network mode, sync the cleared canvas
+        if (IsSpawned && NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            if (IsServer)
+            {
+                // Broadcast clear to all clients
+                ClearCanvasClientRpc();
+            }
+            else
+            {
+                // Send clear request to server
+                ClearCanvasServerRpc();
+            }
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ClearCanvasServerRpc()
+    {
+        // Clear on server and broadcast to all clients
+        ClearCanvasLocally();
+        ClearCanvasClientRpc();
+    }
+
+    [ClientRpc]
+    private void ClearCanvasClientRpc()
+    {
+        ClearCanvasLocally();
+    }
+
+    private void ClearCanvasLocally()
+    {
+        if (sharedTexture == null) return;
+
+        Color[] pixels = new Color[sharedTexture.width * sharedTexture.height];
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            pixels[i] = Color.clear;
+        }
+        
+        sharedTexture.SetPixels(pixels);
         sharedTexture.Apply();
     }
 
