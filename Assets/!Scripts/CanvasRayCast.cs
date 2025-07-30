@@ -56,11 +56,8 @@ public class CanvasRaycast : MonoBehaviour
             NetworkCanvas networkCanvas = hit.collider.GetComponent<NetworkCanvas>();
             if (networkCanvas != null)
             {
-                // Apply paint locally first for immediate feedback
-                networkCanvas.ApplyPaintLocally(hit.textureCoord, markColor, (int)markSize);
-                // Send the paint action to the server with the local client ID
-                ulong clientId = NetworkManager.Singleton.LocalClientId;
-                networkCanvas.PaintServerRpc(hit.textureCoord, markColor, (int)markSize, clientId);
+                // Use the unified Paint method that handles both offline and online modes
+                networkCanvas.Paint(hit.textureCoord, markColor, (int)markSize);
             }
             else
             {

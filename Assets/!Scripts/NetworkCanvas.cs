@@ -6,25 +6,86 @@ public class NetworkCanvas : NetworkBehaviour
 {
     private Texture2D sharedTexture;
     [SerializeField] private Material canvasMaterial; // Assign in Inspector
+    private bool isInitialized = false;
+
+    private void Start()
+    {
+        // Initialize for offline mode or if network isn't ready yet
+        if (!IsSpawned)
+        {
+            InitializeCanvas();
+        }
+    }
 
     public override void OnNetworkSpawn()
     {
-        if (IsServer)
+        // Initialize for network mode
+        if (!isInitialized)
         {
-            // Initialize texture on server
-            sharedTexture = new Texture2D(1028, 1028, TextureFormat.RGBA32, false);
-            Color[] pixels = new Color[1028 * 1028];
-            for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.white;
-            sharedTexture.SetPixels(pixels);
-            sharedTexture.Apply();
-            canvasMaterial.mainTexture = sharedTexture;
-            GetComponent<MeshRenderer>().material = canvasMaterial;
+            InitializeCanvas();
         }
-        else
+    }
+
+    private void InitializeCanvas()
+    {
+        if (isInitialized) return;
+
+        // Initialize texture
+        sharedTexture = new Texture2D(1028, 1028, TextureFormat.RGBA32, false);
+        Color[] pixels = new Color[1028 * 1028];
+        for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.white;
+        sharedTexture.SetPixels(pixels);
+        sharedTexture.Apply();
+        
+        // Apply texture to material
+        if (canvasMaterial != null)
         {
-            sharedTexture = new Texture2D(1028, 1028, TextureFormat.RGBA32, false);
             canvasMaterial.mainTexture = sharedTexture;
+            var meshRenderer = GetComponent<MeshRenderer>();
+            if (meshRenderer != null)
+            {
+                meshRenderer.material = canvasMaterial;
+            }
         }
+
+        isInitialized = true;
+    }
+
+    /// <summary>
+    /// Main paint method that works in both offline and online modes
+    /// </summary>
+    public void Paint(Vector2 uv, Color color, int brushSize)
+    {
+        if (!isInitialized)
+        {
+            InitializeCanvas();
+        }
+
+        // Apply paint locally first
+        ApplyPaintLocally(uv, color, brushSize);
+
+        // If we're in network mode and this is the server or client, send to network
+        if (IsSpawned && NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            if (IsServer)
+            {
+                // If we're the server, broadcast to all clients except ourselves
+                var targetClientIds = NetworkManager.Singleton.ConnectedClientsIds.Where(id => id != NetworkManager.Singleton.LocalClientId).ToArray();
+                if (targetClientIds.Length > 0)
+                {
+                    PaintClientRpc(uv, color, brushSize, new ClientRpcParams
+                    {
+                        Send = new ClientRpcSendParams { TargetClientIds = targetClientIds }
+                    });
+                }
+            }
+            else
+            {
+                // If we're a client, send to server which will broadcast to others
+                PaintServerRpc(uv, color, brushSize, NetworkManager.Singleton.LocalClientId);
+            }
+        }
+        // If not in network mode, just the local paint is enough (offline mode)
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -46,6 +107,11 @@ public class NetworkCanvas : NetworkBehaviour
 
     public void ApplyPaintLocally(Vector2 uv, Color color, int brushSize)
     {
+        if (sharedTexture == null)
+        {
+            InitializeCanvas();
+        }
+
         int x = (int)(uv.x * sharedTexture.width);
         int y = (int)(uv.y * sharedTexture.height);
         for (int i = -brushSize; i <= brushSize; i++)
