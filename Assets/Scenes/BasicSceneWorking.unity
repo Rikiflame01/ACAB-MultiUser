@@ -1753,6 +1753,46 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 873368795934174027, guid: 77ac6b10722bcca4a8baf70e44d89e78,
+        type: 3}
+      propertyPath: m_XOffset
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 873368795934174027, guid: 77ac6b10722bcca4a8baf70e44d89e78,
+        type: 3}
+      propertyPath: m_YOffset
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 873368795934174027, guid: 77ac6b10722bcca4a8baf70e44d89e78,
+        type: 3}
+      propertyPath: m_HideOnStart
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 873368795934174027, guid: 77ac6b10722bcca4a8baf70e44d89e78,
+        type: 3}
+      propertyPath: m_LeftHandXOffset
+      value: -0.25
+      objectReference: {fileID: 0}
+    - target: {fileID: 873368795934174027, guid: 77ac6b10722bcca4a8baf70e44d89e78,
+        type: 3}
+      propertyPath: m_DistanceFromFace
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 873368795934174027, guid: 77ac6b10722bcca4a8baf70e44d89e78,
+        type: 3}
+      propertyPath: m_RightHandXOffset
+      value: 0.25
+      objectReference: {fileID: 0}
+    - target: {fileID: 873368795934174027, guid: 77ac6b10722bcca4a8baf70e44d89e78,
+        type: 3}
+      propertyPath: m_DirectionThreshold
+      value: 0.15
+      objectReference: {fileID: 0}
+    - target: {fileID: 873368795934174027, guid: 77ac6b10722bcca4a8baf70e44d89e78,
+        type: 3}
+      propertyPath: m_PlayerBodyTransform
+      value: 
+      objectReference: {fileID: 1447726552}
     - target: {fileID: 1153587615230119192, guid: 77ac6b10722bcca4a8baf70e44d89e78,
         type: 3}
       propertyPath: m_AnchorMax.y
@@ -5851,6 +5891,12 @@ Transform:
   - {fileID: 1519829579}
   m_Father: {fileID: 1132672566}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!4 &1447726552 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7174019212652907432, guid: 77ac6b10722bcca4a8baf70e44d89e78,
+    type: 3}
+  m_PrefabInstance: {fileID: 367510380}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1454543773
 GameObject:
   m_ObjectHideFlags: 0

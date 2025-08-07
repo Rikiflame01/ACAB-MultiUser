@@ -73,7 +73,7 @@ namespace XRMultiplayer
             ConnectOnline(false);
 
             if (m_ToggleMenuAction != null)
-                m_ToggleMenuAction.action.performed += ctx => ToggleMenu();
+                m_ToggleMenuAction.action.performed += ctx => ToggleMenuWithHandDetection(ctx);
             else
                 Utils.Log("No toggle menu action assigned to OptionsPanel", 1);
 
@@ -188,6 +188,78 @@ namespace XRMultiplayer
         public void ToggleMenu()
         {
             gameObject.SetActive(!gameObject.activeSelf);
+        }
+
+        private void ToggleMenuWithHandDetection(InputAction.CallbackContext context)
+        {
+            // Instead of detecting which controller pressed the button,
+            // detect which hand this menu is currently anchored to
+            DetectWristAnchor();
+            
+            // Toggle the menu
+            ToggleMenu();
+        }
+
+        private void DetectWristAnchor()
+        {
+            // Check the parent hierarchy to determine which wrist this menu is anchored to
+            Transform current = transform;
+            
+            Debug.Log($"PlayerOptions: Starting wrist anchor detection from {current.name}");
+            Debug.Log($"PlayerOptions: Full hierarchy path:");
+            
+            // First, let's print the entire hierarchy for debugging
+            Transform temp = current;
+            string hierarchyPath = "";
+            while (temp != null)
+            {
+                hierarchyPath = temp.name + (hierarchyPath.Length > 0 ? " -> " + hierarchyPath : "");
+                temp = temp.parent;
+            }
+            Debug.Log($"PlayerOptions: Hierarchy: {hierarchyPath}");
+            
+            // Now traverse up the hierarchy looking for left/right hand indicators
+            current = transform;
+            while (current != null)
+            {
+                string name = current.name.ToLower();
+                Debug.Log($"PlayerOptions: Checking '{current.name}' (lowercase: '{name}')");
+                
+                // Enhanced detection patterns - check for various naming conventions
+                bool isLeftHand = (name.Contains("left") && (name.Contains("hand") || name.Contains("wrist") || name.Contains("controller"))) ||
+                                  name.Contains("lefthand") || name.Contains("leftwrist") || name.Contains("leftcontroller") ||
+                                  name.Contains("hand_l") || name.Contains("controller_l") || name.Contains("l_hand") ||
+                                  name.Contains("hand.l") || name.Contains("controller.l") || name.Contains(".l.") ||
+                                  name.EndsWith(".l") || name.StartsWith("l.") || name.Contains("_l_");
+                
+                bool isRightHand = (name.Contains("right") && (name.Contains("hand") || name.Contains("wrist") || name.Contains("controller"))) ||
+                                   name.Contains("righthand") || name.Contains("rightwrist") || name.Contains("rightcontroller") ||
+                                   name.Contains("hand_r") || name.Contains("controller_r") || name.Contains("r_hand") ||
+                                   name.Contains("hand.r") || name.Contains("controller.r") || name.Contains(".r.") ||
+                                   name.EndsWith(".r") || name.StartsWith("r.") || name.Contains("_r_");
+                
+                if (isLeftHand)
+                {
+                    // Menu is on left wrist, so right hand was used to press it
+                    PopoutUI.LastTriggeredHand = 1; // Right hand pressed left wrist menu
+                    Debug.Log($"PlayerOptions: DETECTED LEFT WRIST! Setting LastTriggeredHand = 1 (right hand used)");
+                    return;
+                }
+                
+                if (isRightHand)
+                {
+                    // Menu is on right wrist, so left hand was used to press it
+                    PopoutUI.LastTriggeredHand = -1; // Left hand pressed right wrist menu
+                    Debug.Log($"PlayerOptions: DETECTED RIGHT WRIST! Setting LastTriggeredHand = -1 (left hand used)");
+                    return;
+                }
+                
+                current = current.parent;
+            }
+            
+            // If we couldn't determine the hand, use default
+            PopoutUI.LastTriggeredHand = 0;
+            Debug.Log($"PlayerOptions: Could NOT detect wrist anchor from hierarchy, using default LastTriggeredHand = 0");
         }
 
         public void LogOut()
