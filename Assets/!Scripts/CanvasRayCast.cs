@@ -745,10 +745,29 @@ public class CanvasRaycast : MonoBehaviour
             {
                 // Use the unified Paint method that handles both offline and online modes
                 networkCanvas.Paint(hit.textureCoord, markColor, (int)markSize);
+                
+                // Notify ColorHistory that a color was applied to canvas
+                NotifyColorApplied(markColor);
             }
             else
             {
                 Debug.LogWarning("No NetworkCanvas on hit object!");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Notifies any ColorHistory components that a color was applied to the canvas
+    /// </summary>
+    private void NotifyColorApplied(Color appliedColor)
+    {
+        // Find ColorHistory components in the scene and notify them
+        ColorHistory[] colorHistories = FindObjectsByType<ColorHistory>(FindObjectsSortMode.None);
+        foreach (var colorHistory in colorHistories)
+        {
+            if (colorHistory != null)
+            {
+                colorHistory.OnColorAppliedToCanvas(appliedColor);
             }
         }
     }
