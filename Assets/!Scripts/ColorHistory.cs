@@ -23,6 +23,14 @@ public class ColorHistory : MonoBehaviour
     [Tooltip("Auto-add colors when they're applied to canvas (painting) instead of just selection")]
     private bool trackOnCanvasApplication = true;
 
+    [SerializeField]
+    [Tooltip("Ignore rapid slider changes to prevent flooding history with similar colors")]
+    private bool ignoreSliderChanges = true;
+
+    [SerializeField]
+    [Tooltip("Time delay before adding a color from slider changes (prevents spam)")]
+    private float sliderChangeDelay = 1.0f;
+
     [Header("UI References")]
     [SerializeField]
     [Tooltip("Parent object containing the color history buttons")]
@@ -42,6 +50,11 @@ public class ColorHistory : MonoBehaviour
     private Color lastTrackedColor;
     private bool isLoadingFromHistory = false;
     private CanvasRaycast canvasRaycast; // Reference to track canvas painting events
+    
+    // Slider change tracking
+    private float lastSliderChangeTime = 0f;
+    private Color pendingSliderColor;
+    private bool hasPendingSliderColor = false;
 
     private void Awake()
     {
@@ -173,6 +186,21 @@ public class ColorHistory : MonoBehaviour
     /// </summary>
     private void Update()
     {
+        // Handle pending slider color changes with debounce
+        if (hasPendingSliderColor && ignoreSliderChanges)
+        {
+            if (Time.time - lastSliderChangeTime >= sliderChangeDelay)
+            {
+                // Enough time has passed since last slider change, add the color
+                if (IsColorSignificantlyDifferent(pendingSliderColor, lastTrackedColor))
+                {
+                    AddColorToHistory(pendingSliderColor);
+                    lastTrackedColor = pendingSliderColor;
+                }
+                hasPendingSliderColor = false;
+            }
+        }
+
         // Only track if we have canvas tracking enabled and components available
         if (!trackOnCanvasApplication || canvasRaycast == null || colorWheel == null) return;
 
@@ -216,15 +244,51 @@ public class ColorHistory : MonoBehaviour
         bool isEquipped = canvasRaycast.IsGraffitiCanEquipped();
         bool isPaintingHand = canvasRaycast.IsPaintingHand();
         
-        // Simplified check - if we have painting conditions met, assume we might be painting
-        // The Update method in CanvasRaycast handles the actual painting detection
-        if (isEquipped && isPaintingHand)
+        if (!isEquipped || !isPaintingHand) return false;
+
+        // Check if trigger is actually being pressed (this is the key missing check!)
+        bool isTriggerPressed = false;
+        try
         {
-            // Check if we're aiming at a canvas (simplified detection)
-            return true; // For now, assume painting if conditions are met
+            // Use reflection to access the GetCurrentSelectActionReference method
+            var getCurrentActionMethod = typeof(CanvasRaycast).GetMethod("GetCurrentSelectActionReference", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            if (getCurrentActionMethod != null)
+            {
+                var actionRef = getCurrentActionMethod.Invoke(canvasRaycast, null) as UnityEngine.InputSystem.InputActionReference;
+                isTriggerPressed = actionRef?.action?.IsPressed() ?? false;
+            }
         }
-        
-        return false;
+        catch (System.Exception)
+        {
+            // Reflection failed, fall back to assuming not painting
+            return false;
+        }
+
+        if (!isTriggerPressed) return false;
+
+        // Check if we're aiming at a canvas (use reflection to access isAimingAtCanvas)
+        bool isAimingAtCanvas = false;
+        try
+        {
+            var aimingField = typeof(CanvasRaycast).GetField("isAimingAtCanvas", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            if (aimingField != null)
+            {
+                isAimingAtCanvas = (bool)aimingField.GetValue(canvasRaycast);
+            }
+        }
+        catch (System.Exception)
+        {
+            // Reflection failed, fall back to assuming not aiming at canvas
+            return false;
+        }
+
+        // Only return true if trigger is pressed AND aiming at canvas
+        // This matches the exact conditions used in CanvasRaycast.Update()
+        return isTriggerPressed && isAimingAtCanvas;
     }
 
     /// <summary>
@@ -276,12 +340,54 @@ public class ColorHistory : MonoBehaviour
         // Don't track if we're currently loading from history (prevents loops)
         if (isLoadingFromHistory) return;
 
-        // Check if color is different enough to add to history
-        if (IsColorSignificantlyDifferent(newColor, lastTrackedColor))
+        // Detect if this change might be from sliders (brightness/alpha changes)
+        bool isPotentialSliderChange = IsPotentialSliderChange(newColor, lastTrackedColor);
+
+        if (isPotentialSliderChange && ignoreSliderChanges)
         {
-            AddColorToHistory(newColor);
-            lastTrackedColor = newColor;
+            // This looks like a slider change - use debounced tracking
+            pendingSliderColor = newColor;
+            lastSliderChangeTime = Time.time;
+            hasPendingSliderColor = true;
         }
+        else
+        {
+            // This looks like a direct wheel selection - track immediately
+            if (IsColorSignificantlyDifferent(newColor, lastTrackedColor))
+            {
+                AddColorToHistory(newColor);
+                lastTrackedColor = newColor;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Determines if a color change is likely from slider adjustments rather than wheel selection
+    /// </summary>
+    /// <param name="newColor">The new color</param>
+    /// <param name="previousColor">The previous color</param>
+    /// <returns>True if this looks like a slider change</returns>
+    private bool IsPotentialSliderChange(Color newColor, Color previousColor)
+    {
+        // Convert both colors to HSV
+        Color.RGBToHSV(newColor, out float newH, out float newS, out float newV);
+        Color.RGBToHSV(previousColor, out float prevH, out float prevS, out float prevV);
+
+        // Check if only brightness (Value) or alpha changed significantly
+        // while hue and saturation stayed relatively the same
+        float hueDiff = Mathf.Abs(newH - prevH);
+        float satDiff = Mathf.Abs(newS - prevS);
+        float valueDiff = Mathf.Abs(newV - prevV);
+        float alphaDiff = Mathf.Abs(newColor.a - previousColor.a);
+
+        // If hue and saturation are nearly the same, but brightness or alpha changed,
+        // this is likely a slider change
+        bool hueUnchanged = hueDiff < 0.01f; // Very small hue change
+        bool satUnchanged = satDiff < 0.01f; // Very small saturation change
+        bool valueChanged = valueDiff > 0.01f; // Noticeable brightness change
+        bool alphaChanged = alphaDiff > 0.01f; // Noticeable alpha change
+
+        return (hueUnchanged && satUnchanged && (valueChanged || alphaChanged));
     }
 
     /// <summary>

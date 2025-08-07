@@ -4294,6 +4294,8 @@ MonoBehaviour:
   maxHistorySize: 8
   colorDifferenceThreshold: 0.1
   trackOnCanvasApplication: 1
+  ignoreSliderChanges: 1
+  sliderChangeDelay: 1
   colorHistoryPanel: {fileID: 991422618}
   historyButtons:
   - {fileID: 953725656}
