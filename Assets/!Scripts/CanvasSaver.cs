@@ -96,8 +96,6 @@ public class CanvasSaver : MonoBehaviour
             {
                 DestroyImmediate(exportTexture);
             }
-            
-            Debug.Log($"Canvas saved as: {fullFileName}");
         }
         catch (Exception e)
         {
@@ -162,13 +160,10 @@ public class CanvasSaver : MonoBehaviour
         try
         {
             DownloadFile(pngData, pngData.Length, fileName);
-            Debug.Log($"Download triggered for: {fileName}");
         }
         catch (Exception e)
         {
             Debug.LogError($"CanvasSaver: WebGL download failed - {e.Message}");
-            // Fallback: Log the data size so user knows the operation completed
-            Debug.Log($"Canvas PNG data ready ({pngData.Length} bytes). Browser download not available.");
         }
 #else
         // For editor and standalone builds, save to persistent data path
@@ -176,7 +171,6 @@ public class CanvasSaver : MonoBehaviour
         try
         {
             System.IO.File.WriteAllBytes(filePath, pngData);
-            Debug.Log($"Canvas saved to: {filePath}");
             
             // Try to open the folder (Windows only)
             #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
@@ -186,8 +180,7 @@ public class CanvasSaver : MonoBehaviour
             }
             catch
             {
-                // If opening explorer fails, just show the path
-                Debug.Log($"File saved at: {Application.persistentDataPath}");
+                // Explorer failed to open
             }
             #endif
         }
@@ -264,8 +257,6 @@ public class CanvasSaver : MonoBehaviour
             bool vrExited = false;
             bool fullscreenExited = false;
 
-            Debug.Log("CanvasSaver: Starting VR/Fullscreen exit process...");
-
             // Exit VR mode if enabled and active
             if (exitVROnSave)
             {
@@ -274,7 +265,6 @@ public class CanvasSaver : MonoBehaviour
                 var xrGeneralSettings = UnityEngine.XR.Management.XRGeneralSettings.Instance;
                 if (xrGeneralSettings != null && xrGeneralSettings.Manager != null && xrGeneralSettings.Manager.activeLoader != null)
                 {
-                    Debug.Log("CanvasSaver: Unity XR Management detected - stopping XR...");
                     xrGeneralSettings.Manager.StopSubsystems();
                     xrGeneralSettings.Manager.DeinitializeLoader();
                     vrExited = true;

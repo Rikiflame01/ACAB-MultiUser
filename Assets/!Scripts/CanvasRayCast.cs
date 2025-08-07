@@ -2,6 +2,11 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
 using System.Collections.Generic;
+using System.Reflection;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Inputs;
 
 public class CanvasRaycast : MonoBehaviour
 {
@@ -11,6 +16,7 @@ public class CanvasRaycast : MonoBehaviour
     [SerializeField] private Transform raycastOriginPoint;
     [SerializeField] private float debugLineWidth = 0.05f;
     [SerializeField] private InputActionReference selectActionReference;
+    [SerializeField] private InputActionReference leftHandSelectActionReference; // Left hand trigger reference
     public Color markColor = Color.red;
     public float markSize = 20f;
 
@@ -23,9 +29,27 @@ public class CanvasRaycast : MonoBehaviour
     [SerializeField] private bool useAutomaticScaling = true; // Use automatic pixel-to-world calculation
     [SerializeField] private bool debugScaling = false; // Show debug info for scaling
 
+    [Header("Hand Detection")]
+    [SerializeField] private bool isPaintingHand = true; // Set to true for right hand, false for left hand
+    [SerializeField] private bool autoDetectHand = true; // Automatically detect which hand this is attached to
+    [SerializeField] private HandType handType = HandType.Unknown; // Detected or manually set hand type
+    
     [Header("Equipment State")]
     [SerializeField] private bool isGraffitiCanEquipped = false; // Whether the graffiti can is currently equipped/grabbed
     [SerializeField] private bool requireEquipmentForRaycast = true; // Whether to require equipment for any functionality
+
+    // Hand type enumeration
+    public enum HandType
+    {
+        Unknown,
+        LeftHand,
+        RightHand
+    }
+
+    // References for hand detection
+    private XRInputModalityManager xrModalityManager;
+    private XRRayInteractor rayInteractor; // Store reference to the XR Ray Interactor on this hand
+    private InputActionReference dynamicSelectActionReference; // Dynamic reference based on which hand is holding
 
     private LineRenderer continuousLine;
     private GameObject previewDecal; // Changed from previewCircle to previewDecal
@@ -43,31 +67,63 @@ public class CanvasRaycast : MonoBehaviour
         if (raycastOriginPoint == null) Debug.LogWarning("RaycastOriginPoint not assigned!");
         if (selectActionReference?.action == null) Debug.LogWarning("Select Action Reference invalid!");
         else selectActionReference.action.Enable();
+        
+        if (leftHandSelectActionReference?.action == null) Debug.LogWarning("Left Hand Select Action Reference not assigned!");
+        else leftHandSelectActionReference.action.Enable();
 
-        SetupContinuousLine();
-        // Note: Canvas preview is handled directly on the canvas texture
+        // Since this script is on the graffiti can, we need to check grab state
+        XRGrabInteractable grabInteractable = GetComponent<XRGrabInteractable>();
+        if (grabInteractable != null)
+        {
+            // Subscribe to grab events to detect when picked up/dropped
+            grabInteractable.selectEntered.AddListener(OnGrabbed);
+            grabInteractable.selectExited.AddListener(OnReleased);
+            
+            // Check if already grabbed at start
+            if (grabInteractable.isSelected)
+            {
+                isGraffitiCanEquipped = true;
+                if (autoDetectHand)
+                {
+                    DetectHandType();
+                }
+            }
+        }
+        else
+        {
+            Debug.LogError("CanvasRaycast script requires XRGrabInteractable component on the graffiti can!");
+        }
+
+        // Only setup raycast functionality if this is being held by the painting hand
+        if (ShouldEnableRaycastFunctionality())
+        {
+            SetupContinuousLine();
+        }
     }
 
     void OnDestroy()
     {
         if (selectActionReference?.action != null)
             selectActionReference.action.Disable();
+        if (leftHandSelectActionReference?.action != null)
+            leftHandSelectActionReference.action.Disable();
     }
 
     void Update()
     {
-        // Early exit if graffiti can is not equipped and we require equipment
-        if (requireEquipmentForRaycast && !isGraffitiCanEquipped)
+        // Early exit if this is not the painting hand or equipment is not available
+        if (!ShouldEnableRaycastFunctionality())
         {
-            // Hide any existing preview and disable line when not equipped
+            // Ensure raycast visuals are hidden when not active
+            if (continuousLine != null)
+                continuousLine.enabled = false;
             HideCanvasPreview();
-            continuousLine.enabled = false;
             isAimingAtCanvas = false;
             currentTargetCanvas = null;
             return;
         }
 
-        bool isEquipped = selectActionReference?.action?.IsPressed() ?? false;
+        bool isEquipped = GetCurrentSelectActionReference()?.action?.IsPressed() ?? false;
         continuousLine.enabled = isEquipped;
 
         // Always cast ray to detect canvas
@@ -81,6 +137,357 @@ public class CanvasRaycast : MonoBehaviour
             PaintAtLastHitPoint();
         }
     }
+
+    #region Hand Detection and Equipment Management
+
+    /// <summary>
+    /// Detects which hand is currently holding this graffiti can by checking XRGrabInteractable
+    /// </summary>
+    private void DetectHandType()
+    {
+        // Find XRInputModalityManager for hand references
+        xrModalityManager = FindFirstObjectByType<XRInputModalityManager>();
+        
+        // Get the XRGrabInteractable component on this graffiti can
+        XRGrabInteractable grabInteractable = GetComponent<XRGrabInteractable>();
+        
+        if (grabInteractable != null && grabInteractable.isSelected)
+        {
+            // Get the interactor that's currently grabbing this can
+            var interactor = grabInteractable.interactorsSelecting[0];
+            
+            if (xrModalityManager != null)
+            {
+                // Check if the grabbing interactor is the left or right controller
+                if (IsChildOf(interactor.transform, xrModalityManager.leftController?.transform))
+                {
+                    handType = HandType.LeftHand;
+                    isPaintingHand = true; // Whichever hand is holding the can becomes the painting hand
+                    rayInteractor = interactor.transform.GetComponent<XRRayInteractor>();
+                    
+                    // Try to find the correct input action for the left controller
+                    UpdateInputActionReference(interactor.transform);
+                }
+                else if (IsChildOf(interactor.transform, xrModalityManager.rightController?.transform))
+                {
+                    handType = HandType.RightHand;
+                    isPaintingHand = true; // Whichever hand is holding the can becomes the painting hand
+                    rayInteractor = interactor.transform.GetComponent<XRRayInteractor>();
+                    
+                    // Try to find the correct input action for the right controller
+                    UpdateInputActionReference(interactor.transform);
+                }
+            }
+            
+            // Fallback: Check interactor parent names for common naming conventions
+            if (handType == HandType.Unknown)
+            {
+                Transform current = interactor.transform;
+                while (current != null)
+                {
+                    string name = current.name.ToLower();
+                    if (name.Contains("left"))
+                    {
+                        handType = HandType.LeftHand;
+                        isPaintingHand = true; // Whichever hand is holding the can becomes the painting hand
+                        rayInteractor = current.GetComponent<XRRayInteractor>();
+                        if (rayInteractor == null) rayInteractor = current.GetComponentInChildren<XRRayInteractor>();
+                        
+                        // Try to find the correct input action for the left controller
+                        UpdateInputActionReference(current);
+                        
+                        break;
+                    }
+                    else if (name.Contains("right"))
+                    {
+                        handType = HandType.RightHand;
+                        isPaintingHand = true; // Whichever hand is holding the can becomes the painting hand
+                        rayInteractor = current.GetComponent<XRRayInteractor>();
+                        if (rayInteractor == null) rayInteractor = current.GetComponentInChildren<XRRayInteractor>();
+                        
+                        // Try to find the correct input action for the right controller
+                        UpdateInputActionReference(current);
+                        
+                        break;
+                    }
+                    current = current.parent;
+                }
+            }
+        }
+        else
+        {
+            // Graffiti can is not currently being held
+            handType = HandType.Unknown;
+            isPaintingHand = false;
+            rayInteractor = null;
+        }
+        
+        if (handType == HandType.Unknown && grabInteractable != null && grabInteractable.isSelected)
+        {
+            Debug.LogWarning("Could not detect which hand is holding the graffiti can! Please ensure proper controller hierarchy naming.");
+        }
+    }
+
+    /// <summary>
+    /// Helper method to check if this transform is a child of the specified parent
+    /// </summary>
+    private bool IsChildOf(Transform childTransform, Transform parentTransform)
+    {
+        if (parentTransform == null || childTransform == null) return false;
+        
+        Transform current = childTransform;
+        while (current != null)
+        {
+            if (current == parentTransform)
+                return true;
+            current = current.parent;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Helper method to check if this transform is a child of the specified parent (original method)
+    /// </summary>
+    private bool IsChildOf(Transform parentTransform)
+    {
+        return IsChildOf(transform, parentTransform);
+    }
+
+    /// <summary>
+    /// Determines if raycast functionality should be enabled based on hand type and equipment state
+    /// </summary>
+    private bool ShouldEnableRaycastFunctionality()
+    {
+        // Only enable on the painting hand
+        if (!isPaintingHand)
+            return false;
+
+        // Check equipment requirement
+        if (requireEquipmentForRaycast && !isGraffitiCanEquipped)
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Updates the input action reference to use the correct controller's trigger
+    /// </summary>
+    private void UpdateInputActionReference(Transform controllerTransform)
+    {
+        // Try the reflection approach first
+        bool foundActionViaReflection = TryFindActionViaReflection(controllerTransform);
+        
+        if (!foundActionViaReflection)
+        {
+            // Fallback: Create controller-specific input action
+            CreateControllerSpecificInputAction(controllerTransform);
+        }
+    }
+
+    /// <summary>
+    /// Attempts to find the correct input action using reflection
+    /// </summary>
+    private bool TryFindActionViaReflection(Transform controllerTransform)
+    {
+        // Try to find a more generic trigger action by searching for common input action names
+        var actionProperties = controllerTransform.GetComponentsInChildren<MonoBehaviour>();
+        
+        foreach (var component in actionProperties)
+        {
+            // Use reflection to find InputActionProperty fields that might be triggers
+            var fields = component.GetType().GetFields();
+            foreach (var field in fields)
+            {
+                if (field.FieldType == typeof(InputActionProperty))
+                {
+                    var actionProperty = (InputActionProperty)field.GetValue(component);
+                    if (actionProperty.action != null)
+                    {
+                        string actionName = actionProperty.action.name.ToLower();
+                        
+                        // Look for trigger-related actions
+                        if (actionName.Contains("select") || actionName.Contains("trigger") || actionName.Contains("activate"))
+                        {
+                            // Test if this action actually responds to the current controller
+                            bool actionRespondsToController = TestActionForController(actionProperty.action, controllerTransform);
+                            
+                            if (actionRespondsToController)
+                            {
+                                // Create a temporary InputActionReference to test this action
+                                var tempReference = ScriptableObject.CreateInstance<InputActionReference>();
+                                tempReference.Set(actionProperty.action);
+                                
+                                dynamicSelectActionReference = tempReference;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    /// <summary>
+    /// Tests if an action responds to the given controller
+    /// </summary>
+    private bool TestActionForController(InputAction action, Transform controllerTransform)
+    {
+        string controllerName = controllerTransform.name.ToLower();
+        bool isLeftController = controllerName.Contains("left");
+        bool isRightController = controllerName.Contains("right");
+        
+        // Check the action's bindings to see if they match the controller
+        for (int i = 0; i < action.bindings.Count; i++)
+        {
+            var binding = action.bindings[i];
+            string bindingPath = binding.path.ToLower();
+            
+            // Check if binding matches the controller type
+            if (isLeftController && bindingPath.Contains("lefthand"))
+            {
+                return true;
+            }
+            else if (isRightController && bindingPath.Contains("righthand"))
+            {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the appropriate select action reference based on current controller
+    /// </summary>
+    private InputActionReference GetCurrentSelectActionReference()
+    {
+        // Use hand-specific reference if available
+        if (handType == HandType.LeftHand && leftHandSelectActionReference != null)
+        {
+            return leftHandSelectActionReference;
+        }
+        else if (handType == HandType.RightHand && selectActionReference != null)
+        {
+            return selectActionReference;
+        }
+        
+        // Use dynamic reference if available, otherwise fall back to original
+        return dynamicSelectActionReference ?? selectActionReference;
+    }
+
+    /// <summary>
+    /// Creates a proper input action reference for the controller that's holding the graffiti can
+    /// </summary>
+    private void CreateControllerSpecificInputAction(Transform controllerTransform)
+    {
+        string controllerName = controllerTransform.name.ToLower();
+        string bindingPath;
+        
+        // Determine the correct binding path based on controller type
+        if (controllerName.Contains("left"))
+        {
+            bindingPath = "<XRController>{LeftHand}/triggerPressed";
+        }
+        else if (controllerName.Contains("right"))
+        {
+            bindingPath = "<XRController>{RightHand}/triggerPressed";
+        }
+        else
+        {
+            Debug.LogWarning($"Could not determine controller type from name: {controllerTransform.name}");
+            dynamicSelectActionReference = selectActionReference;
+            return;
+        }
+        
+        // Create a new InputAction specifically for this controller
+        var newAction = new InputAction($"GraffitiTrigger_{handType}", InputActionType.Button);
+        newAction.AddBinding(bindingPath);
+        
+        // Enable the action
+        newAction.Enable();
+        
+        // Create InputActionReference
+        var newReference = ScriptableObject.CreateInstance<InputActionReference>();
+        newReference.Set(newAction);
+        
+        dynamicSelectActionReference = newReference;
+    }
+
+    /// <summary>
+    /// Disables the default XR Ray Interactor on this hand when graffiti painting is active
+    /// This preserves UI functionality for the non-painting hand
+    /// </summary>
+    private void SetRayInteractorState(bool enabled)
+    {
+        if (rayInteractor != null)
+        {
+            rayInteractor.enabled = enabled;
+        }
+    }
+
+    /// <summary>
+    /// Called when the graffiti can is grabbed by a hand
+    /// </summary>
+    private void OnGrabbed(SelectEnterEventArgs args)
+    {
+        isGraffitiCanEquipped = true;
+        
+        // Detect which hand grabbed the can
+        if (autoDetectHand)
+        {
+            DetectHandType();
+        }
+        
+        if (isPaintingHand)
+        {
+            // Disable default ray interactor on painting hand to prevent conflicts
+            SetRayInteractorState(false);
+            
+            // Setup continuous line if not already done
+            if (continuousLine == null)
+            {
+                SetupContinuousLine();
+            }
+        }
+        else
+        {
+            // Graffiti can equipped on non-painting hand - maintaining default UI raycast functionality
+        }
+    }
+
+    /// <summary>
+    /// Called when the graffiti can is released/dropped
+    /// </summary>
+    private void OnReleased(SelectExitEventArgs args)
+    {
+        isGraffitiCanEquipped = false;
+        handType = HandType.Unknown;
+        
+        if (isPaintingHand)
+        {
+            // Re-enable default ray interactor on painting hand
+            SetRayInteractorState(true);
+        }
+        
+        // Reset painting hand status
+        isPaintingHand = false;
+        rayInteractor = null;
+        
+        // Immediately hide any active preview when unequipped
+        HideCanvasPreview();
+        isAimingAtCanvas = false;
+        currentTargetCanvas = null;
+        
+        // Disable continuous line
+        if (continuousLine != null)
+        {
+            continuousLine.enabled = false;
+        }
+    }
+
+    #endregion
 
     public void CastRayFromPoint(Vector3 raycastOrigin, Vector3 raycastDirection)
     {
@@ -104,17 +511,11 @@ public class CanvasRaycast : MonoBehaviour
             }
             
             // Only show preview when NOT currently painting
-            bool isPainting = selectActionReference?.action?.IsPressed() ?? false;
+            bool isPainting = GetCurrentSelectActionReference()?.action?.IsPressed() ?? false;
             if (!isPainting)
             {
                 // Update preview position and visibility
                 UpdateCanvasPreview(hit.textureCoord, hit.point, hit.normal);
-            }
-            
-            // Reduced debug spam - only log occasionally
-            if (Time.frameCount % 60 == 0) // Log once per second at 60fps
-            {
-                Debug.Log($"Aiming at: {hit.collider.gameObject.name} at {hit.point}");
             }
         }
         else
@@ -126,12 +527,6 @@ public class CanvasRaycast : MonoBehaviour
             isAimingAtCanvas = false;
             currentTargetCanvas = null;
             HideCanvasPreview();
-            
-            // Reduced debug spam
-            if (Time.frameCount % 120 == 0) // Log every 2 seconds at 60fps
-            {
-                Debug.Log("Raycast missed Canvas layer");
-            }
         }
     }
 
@@ -157,7 +552,6 @@ public class CanvasRaycast : MonoBehaviour
         continuousLine.startColor = continuousLine.endColor = Color.white;
         continuousLine.material.color = Color.white;
         continuousLine.enabled = false;
-        Debug.Log("Continuous line setup complete.");
     }
 
     private void UpdateContinuousLine(Vector3 start, Vector3 end, Color color)
@@ -184,11 +578,6 @@ public class CanvasRaycast : MonoBehaviour
 
         // Draw preview on canvas
         DrawPreviewOnCanvas(uv, canvasTexture);
-
-        if (debugScaling && Time.frameCount % 60 == 0)
-        {
-            Debug.Log($"Preview updated at UV: {uv}, World: {worldPos}");
-        }
     }
 
     /// <summary>
@@ -321,17 +710,11 @@ public class CanvasRaycast : MonoBehaviour
     {
         if (!showPreview || currentTargetCanvas == null) 
         {
-            if (!showPreview) Debug.Log("Preview disabled");
-            if (currentTargetCanvas == null) Debug.Log("Target canvas is null");
             return;
         }
-
-        Debug.Log($"Updating preview at position: {position}");
         
         // Update the canvas preview using stored UV coordinates
         UpdateCanvasPreview(lastHitUV, position, normal);
-        
-        Debug.Log($"Canvas preview updated");
     }
 
     private void HidePreview()
@@ -344,7 +727,6 @@ public class CanvasRaycast : MonoBehaviour
     {
         // This method now uses canvas-based preview instead of 3D objects
         // Canvas preview is handled by UpdateCanvasPreview method
-        Debug.Log("UpdatePreviewAppearance called - using canvas-based preview");
     }
 
     private void PaintAtLastHitPoint()
@@ -396,26 +778,44 @@ public class CanvasRaycast : MonoBehaviour
     {
         showPreview = enabled;
         // Canvas-based preview will be updated automatically when aiming at canvas
-        Debug.Log($"Preview toggled: {enabled}");
     }
 
     /// <summary>
-    /// Equipment state management - call these from VR interaction systems
+    /// Equipment state management - these are now handled automatically by grab events
+    /// Keep for backward compatibility or manual testing
     /// </summary>
     public void OnGraffitiCanEquipped()
     {
+        Debug.LogWarning("OnGraffitiCanEquipped() called manually - equipment state is now handled automatically by grab events");
+        
+        // Force equipment state for testing
         isGraffitiCanEquipped = true;
-        Debug.Log("Graffiti can equipped - raycast and preview enabled");
+        
+        if (autoDetectHand)
+        {
+            DetectHandType();
+        }
+        
+        if (isPaintingHand)
+        {
+            SetRayInteractorState(false);
+        }
     }
 
     public void OnGraffitiCanUnequipped()
     {
+        Debug.LogWarning("OnGraffitiCanUnequipped() called manually - equipment state is now handled automatically by grab events");
+        
         isGraffitiCanEquipped = false;
-        // Immediately hide any active preview when unequipped
+        
+        if (isPaintingHand)
+        {
+            SetRayInteractorState(true);
+        }
+        
         HideCanvasPreview();
         isAimingAtCanvas = false;
         currentTargetCanvas = null;
-        Debug.Log("Graffiti can unequipped - raycast and preview disabled");
     }
 
     /// <summary>
@@ -427,12 +827,45 @@ public class CanvasRaycast : MonoBehaviour
     }
 
     /// <summary>
+    /// Get current hand type for debugging
+    /// </summary>
+    public HandType GetHandType()
+    {
+        return handType;
+    }
+
+    /// <summary>
+    /// Check if this is the designated painting hand
+    /// </summary>
+    public bool IsPaintingHand()
+    {
+        return isPaintingHand;
+    }
+
+    /// <summary>
+    /// Manually set hand type (useful for testing or when auto-detection fails)
+    /// </summary>
+    public void SetHandType(HandType newHandType)
+    {
+        handType = newHandType;
+        // When manually setting hand type, assume the graffiti can is equipped and this hand should paint
+        isPaintingHand = (newHandType != HandType.Unknown);
+    }
+
+    /// <summary>
+    /// Toggle whether this should be treated as the painting hand
+    /// </summary>
+    public void SetAsPaintingHand(bool isPainting)
+    {
+        isPaintingHand = isPainting;
+    }
+
+    /// <summary>
     /// Toggle whether equipment is required for functionality (useful for testing)
     /// </summary>
     public void SetRequireEquipment(bool required)
     {
         requireEquipmentForRaycast = required;
-        Debug.Log($"Require equipment for raycast: {required}");
     }
 
     /// <summary>
@@ -494,7 +927,6 @@ public class CanvasRaycast : MonoBehaviour
         if (lastHitUV != Vector2.zero)
         {
             UpdateCanvasPreview(lastHitUV, Vector3.zero, Vector3.up);
-            Debug.Log($"Test canvas preview shown at UV: {lastHitUV}");
         }
         else
         {
@@ -518,14 +950,114 @@ public class CanvasRaycast : MonoBehaviour
     }
 
     /// <summary>
+    /// Test hand detection
+    /// </summary>
+    [ContextMenu("Test Detect Hand Type")]
+    public void TestDetectHandType()
+    {
+        DetectHandType();
+    }
+
+    [ContextMenu("Force Enable Painting (Left Hand)")]
+    public void TestForceLeftHandPainting()
+    {
+        handType = HandType.LeftHand;
+        isPaintingHand = true;
+        isGraffitiCanEquipped = true;
+    }
+
+    [ContextMenu("Force Enable Painting (Right Hand)")]
+    public void TestForceRightHandPainting()
+    {
+        handType = HandType.RightHand;
+        isPaintingHand = true;
+        isGraffitiCanEquipped = true;
+    }
+
+    [ContextMenu("Force Create Left Hand Action")]
+    public void TestForceCreateLeftHandAction()
+    {
+        // Manually create a left hand action for testing
+        var leftAction = new InputAction("TestGraffitiTrigger_LeftHand", InputActionType.Button);
+        leftAction.AddBinding("<XRController>{LeftHand}/triggerPressed");
+        leftAction.Enable();
+        
+        var newReference = ScriptableObject.CreateInstance<InputActionReference>();
+        newReference.Set(leftAction);
+        
+        dynamicSelectActionReference = newReference;
+    }
+
+    [ContextMenu("Debug Input Actions")]
+    public void DebugInputActions()
+    {
+        Debug.Log($"=== INPUT ACTION DEBUG ===");
+        Debug.Log($"Right hand selectActionReference: {selectActionReference?.action?.name}");
+        Debug.Log($"Left hand leftHandSelectActionReference: {leftHandSelectActionReference?.action?.name}");
+        Debug.Log($"Dynamic selectActionReference: {dynamicSelectActionReference?.action?.name}");
+        Debug.Log($"Current hand type: {handType}");
+        Debug.Log($"Current action (GetCurrentSelectActionReference): {GetCurrentSelectActionReference()?.action?.name}");
+        
+        var currentAction = GetCurrentSelectActionReference();
+        if (currentAction?.action != null)
+        {
+            Debug.Log($"Action enabled: {currentAction.action.enabled}");
+            Debug.Log($"Action isPressed: {currentAction.action.IsPressed()}");
+            Debug.Log($"Action phase: {currentAction.action.phase}");
+            Debug.Log($"Action bindings count: {currentAction.action.bindings.Count}");
+            
+            for (int i = 0; i < currentAction.action.bindings.Count; i++)
+            {
+                var binding = currentAction.action.bindings[i];
+                Debug.Log($"  Binding {i}: {binding.path} (groups: {binding.groups})");
+            }
+        }
+        
+        if (xrModalityManager != null)
+        {
+            Debug.Log($"Left controller: {xrModalityManager.leftController?.name}");
+            Debug.Log($"Right controller: {xrModalityManager.rightController?.name}");
+        }
+    }
+
+    [ContextMenu("Set as Left Hand")]
+    public void TestSetAsLeftHand()
+    {
+        SetHandType(HandType.LeftHand);
+    }
+
+    [ContextMenu("Set as Right Hand")]
+    public void TestSetAsRightHand()
+    {
+        SetHandType(HandType.RightHand);
+    }
+
+    [ContextMenu("Toggle Painting Hand")]
+    public void TestTogglePaintingHand()
+    {
+        SetAsPaintingHand(!isPaintingHand);
+    }
+
+    /// <summary>
     /// Check if preview system is properly initialized
     /// </summary>
     [ContextMenu("Debug Preview Status")]
     public void DebugPreviewStatus()
     {
+        Debug.Log($"=== HAND DETECTION ===");
+        Debug.Log($"Hand Type: {handType}");
+        Debug.Log($"Is Painting Hand: {isPaintingHand}");
+        Debug.Log($"Auto Detect Hand: {autoDetectHand}");
+        Debug.Log($"XR Modality Manager Found: {xrModalityManager != null}");
+        Debug.Log($"XR Ray Interactor Found: {rayInteractor != null}");
+        if (rayInteractor != null)
+            Debug.Log($"XR Ray Interactor Enabled: {rayInteractor.enabled}");
+        
         Debug.Log($"=== EQUIPMENT STATE ===");
         Debug.Log($"Graffiti Can Equipped: {isGraffitiCanEquipped}");
         Debug.Log($"Require Equipment: {requireEquipmentForRaycast}");
+        Debug.Log($"Should Enable Raycast: {ShouldEnableRaycastFunctionality()}");
+        
         Debug.Log($"=== PREVIEW STATE ===");
         Debug.Log($"Show Preview: {showPreview}");
         Debug.Log($"Current target canvas: {currentTargetCanvas != null}");

@@ -24,7 +24,6 @@ public class TransparentCanvasMaterialSetup : MonoBehaviour
         if (targetMaterial != null)
         {
             SetupTransparentMaterial(targetMaterial);
-            Debug.Log($"Material '{targetMaterial.name}' has been configured for transparency.");
         }
         else
         {

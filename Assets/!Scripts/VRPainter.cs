@@ -57,7 +57,6 @@ public class VRPainter : MonoBehaviour
     {
         if (selectAction != null && selectAction.action.ReadValue<float>() > 0.5f)
         {
-            Debug.Log("Select action triggered. on right controller");
             if (rayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
             {
                 Renderer renderer = hit.collider.GetComponent<Renderer>();

@@ -105,8 +105,6 @@ public class ColorSelector : MonoBehaviour
 
         // Update the markColor in the CanvasRaycast script
         canvasRaycast.markColor = selectedColor;
-
-        Debug.Log($"Color updated: R={r}, G={g}, B={b}");
     }
 
     private void UpdateMarkSize(float value)
@@ -126,7 +124,5 @@ public class ColorSelector : MonoBehaviour
 
         // Apply the scale to the preview image's RectTransform
         markSizePreviewImage.rectTransform.localScale = new Vector3(previewScale, previewScale, 1f);
-
-        Debug.Log($"Mark Size updated: {markSize}, Preview Scale: {previewScale}");
     }
 }
