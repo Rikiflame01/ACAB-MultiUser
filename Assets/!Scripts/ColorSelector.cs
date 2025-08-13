@@ -31,6 +31,10 @@ public class ColorSelector : MonoBehaviour
     [Tooltip("Reference to the CanvasRaycast script to update the mark color and size.")]
     private CanvasRaycast canvasRaycast;
 
+    [SerializeField]
+    [Tooltip("TextMeshProUGUI to display the current mark size value.")]
+    private TMPro.TextMeshProUGUI markSizeText;
+
     private const float MIN_MARK_SIZE = 1f; // Minimum mark size (as defined in requirements)
     private const float MAX_MARK_SIZE = 100f; // Maximum mark size
     private const float MIN_PREVIEW_SCALE = 0.4f; // Scale at mark size 1
@@ -65,6 +69,11 @@ public class ColorSelector : MonoBehaviour
             Debug.LogError("CanvasRaycast reference is not assigned in the Inspector!", this);
             enabled = false;
             return;
+        }
+
+        if (markSizeText == null)
+        {
+            Debug.LogWarning("Mark Size TextMeshProUGUI is not assigned in the Inspector! Numerical display will be disabled.", this);
         }
     }
 
@@ -117,6 +126,12 @@ public class ColorSelector : MonoBehaviour
 
         // Update the markSize in the CanvasRaycast script
         canvasRaycast.markSize = markSize;
+
+        // Update the numerical display if assigned
+        if (markSizeText != null)
+        {
+            markSizeText.text = Mathf.RoundToInt(markSize).ToString();
+        }
 
         // Map the markSize (1 to 100) to the preview scale (0.4 to 1)
         float t = (markSize - MIN_MARK_SIZE) / (MAX_MARK_SIZE - MIN_MARK_SIZE); // Normalize to 0-1
