@@ -126,8 +126,16 @@ public class CanvasRaycast : MonoBehaviour
         bool isEquipped = GetCurrentSelectActionReference()?.action?.IsPressed() ?? false;
         continuousLine.enabled = isEquipped;
 
-        // Always cast ray to detect canvas
-        CastRayFromObjectPosition();
+        // Only show preview if user is NOT moving on X or Z axis (WASD or left stick)
+        if (!IsUserMovingXZ())
+        {
+            // Always cast ray to detect canvas
+            CastRayFromObjectPosition();
+        }
+        else
+        {
+            HideCanvasPreview();
+        }
 
         // Only paint when actually pressing the button
         if (isEquipped && isAimingAtCanvas)
@@ -136,6 +144,28 @@ public class CanvasRaycast : MonoBehaviour
             HideCanvasPreview();
             PaintAtLastHitPoint();
         }
+    }
+
+    // Returns true if user is moving on X or Z axis (WASD or left stick)
+    private bool IsUserMovingXZ()
+    {
+        // WASD (keyboard)
+        var keyboard = Keyboard.current;
+        if (keyboard != null)
+        {
+            if (keyboard.wKey.isPressed || keyboard.aKey.isPressed || keyboard.sKey.isPressed || keyboard.dKey.isPressed)
+                return true;
+        }
+        // Left stick (Gamepad)
+        var gamepad = Gamepad.current;
+        if (gamepad != null)
+        {
+            Vector2 stick = gamepad.leftStick.ReadValue();
+            if (Mathf.Abs(stick.x) > 0.1f || Mathf.Abs(stick.y) > 0.1f)
+                return true;
+        }
+        // XR input system (if using XR controllers) - not all XRController types have stick, so skip for now
+        return false;
     }
 
     #region Hand Detection and Equipment Management
