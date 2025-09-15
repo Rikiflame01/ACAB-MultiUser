@@ -684,8 +684,8 @@ public class CanvasRaycast : MonoBehaviour
         int brushRadius = (int)markSize;
 
         // Create preview color (semi-transparent version of brush color)
-        Color previewColor = markColor;
-        previewColor.a = previewOpacity;
+        Color previewColor = ApplyDistanceBasedOpacity(markColor);
+        previewColor.a *= previewOpacity; // Apply preview transparency on top of distance opacity
 
         // Draw preview brush
         for (int x = -brushRadius; x <= brushRadius; x++)
@@ -773,17 +773,47 @@ public class CanvasRaycast : MonoBehaviour
             NetworkCanvas networkCanvas = hit.collider.GetComponent<NetworkCanvas>();
             if (networkCanvas != null)
             {
+                // Apply distance-based opacity right before painting
+                Color paintColor = ApplyDistanceBasedOpacity(markColor);
+                
                 // Use the unified Paint method that handles both offline and online modes
-                networkCanvas.Paint(hit.textureCoord, markColor, (int)markSize);
+                networkCanvas.Paint(hit.textureCoord, paintColor, (int)markSize);
                 
                 // Notify ColorHistory that a color was applied to canvas
-                NotifyColorApplied(markColor);
+                NotifyColorApplied(paintColor);
             }
             else
             {
                 Debug.LogWarning("No NetworkCanvas on hit object!");
             }
         }
+    }
+
+    /// <summary>
+    /// Applies distance-based opacity if a DistanceBasedOpacityController is available
+    /// </summary>
+    private Color ApplyDistanceBasedOpacity(Color originalColor)
+    {
+        // Try to find DistanceBasedOpacityController in the scene
+        var opacityController = FindFirstObjectByType<DistanceBasedOpacityController>();
+        if (opacityController != null && opacityController.enabled)
+        {
+            // Apply the distance-based opacity
+            Color adjustedColor = originalColor;
+            float distanceOpacity = opacityController.GetCurrentOpacity();
+            adjustedColor.a = distanceOpacity;
+            
+            // Debug output (can be disabled by turning off debug logging in opacity controller)
+            if (Mathf.Abs(originalColor.a - distanceOpacity) > 0.01f)
+            {
+                Debug.Log($"Applied distance-based opacity: {originalColor.a:F3} -> {distanceOpacity:F3} (Distance: {opacityController.GetNearestCanvasDistance():F2}m)");
+            }
+            
+            return adjustedColor;
+        }
+        
+        // Return original color if no opacity controller found
+        return originalColor;
     }
 
     /// <summary>
