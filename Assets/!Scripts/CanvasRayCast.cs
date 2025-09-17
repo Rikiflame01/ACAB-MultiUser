@@ -37,6 +37,11 @@ public class CanvasRaycast : MonoBehaviour
     [Header("Equipment State")]
     [SerializeField] private bool isGraffitiCanEquipped = false; // Whether the graffiti can is currently equipped/grabbed
     [SerializeField] private bool requireEquipmentForRaycast = true; // Whether to require equipment for any functionality
+    
+    [Header("Eraser Settings")]
+    [SerializeField] private bool isEraserMode = false; // Whether eraser mode is currently active
+    [SerializeField] private Color eraserPreviewColor = Color.white; // Color to show for eraser preview
+    [SerializeField] private float eraserPreviewOpacity = 0.3f; // Opacity for eraser preview
 
     // Hand type enumeration
     public enum HandType
@@ -683,9 +688,24 @@ public class CanvasRaycast : MonoBehaviour
         int centerY = (int)(uv.y * canvasTexture.height);
         int brushRadius = (int)markSize;
 
-        // Create preview color (semi-transparent version of brush color)
-        Color previewColor = ApplyDistanceBasedOpacity(markColor);
-        previewColor.a *= previewOpacity; // Apply preview transparency on top of distance opacity
+        Color previewColor;
+        float previewAlpha;
+        
+        if (isEraserMode)
+        {
+            // Use eraser preview color and opacity
+            previewColor = eraserPreviewColor;
+            previewAlpha = eraserPreviewOpacity;
+        }
+        else
+        {
+            // Create preview color (semi-transparent version of brush color)
+            previewColor = ApplyDistanceBasedOpacity(markColor);
+            previewAlpha = previewOpacity;
+        }
+
+        // Apply preview transparency
+        previewColor.a *= previewAlpha;
 
         // Draw preview brush
         for (int x = -brushRadius; x <= brushRadius; x++)
@@ -700,8 +720,23 @@ public class CanvasRaycast : MonoBehaviour
                     // Get original pixel
                     Color originalPixel = canvasTexture.GetPixel(pixelX, pixelY);
                     
-                    // Blend preview color with original
-                    Color blendedColor = Color.Lerp(originalPixel, previewColor, previewOpacity);
+                    Color blendedColor;
+                    
+                    if (isEraserMode)
+                    {
+                        // For eraser preview, create a darker/lighter overlay to show eraser area
+                        // Make it more visible by inverting brightness
+                        float brightness = (originalPixel.r + originalPixel.g + originalPixel.b) / 3f;
+                        Color overlayColor = brightness > 0.5f ? Color.black : Color.white;
+                        overlayColor.a = previewAlpha;
+                        
+                        blendedColor = Color.Lerp(originalPixel, overlayColor, previewAlpha);
+                    }
+                    else
+                    {
+                        // Normal paint preview
+                        blendedColor = Color.Lerp(originalPixel, previewColor, previewAlpha);
+                    }
                     
                     canvasTexture.SetPixel(pixelX, pixelY, blendedColor);
                 }
@@ -773,8 +808,18 @@ public class CanvasRaycast : MonoBehaviour
             NetworkCanvas networkCanvas = hit.collider.GetComponent<NetworkCanvas>();
             if (networkCanvas != null)
             {
-                // Apply distance-based opacity right before painting
-                Color paintColor = ApplyDistanceBasedOpacity(markColor);
+                Color paintColor;
+                
+                if (isEraserMode)
+                {
+                    // Use transparent color for erasing (alpha 0)
+                    paintColor = Color.clear;
+                }
+                else
+                {
+                    // Apply distance-based opacity right before painting
+                    paintColor = ApplyDistanceBasedOpacity(markColor);
+                }
                 
                 // Use the unified Paint method that handles both offline and online modes
                 networkCanvas.Paint(hit.textureCoord, paintColor, (int)markSize);
@@ -981,6 +1026,86 @@ public class CanvasRaycast : MonoBehaviour
         UpdatePreviewAppearance();
     }
 
+    #region Eraser Mode Controls
+
+    /// <summary>
+    /// Toggle eraser mode on/off
+    /// </summary>
+    public void ToggleEraserMode()
+    {
+        SetEraserMode(!isEraserMode);
+    }
+
+    /// <summary>
+    /// Set eraser mode state
+    /// </summary>
+    public void SetEraserMode(bool enabled)
+    {
+        isEraserMode = enabled;
+        
+        // Update preview appearance immediately if currently aiming at canvas
+        if (isAimingAtCanvas && showPreview)
+        {
+            UpdateCanvasPreview(lastHitUV, lastHitPoint, lastHitNormal);
+        }
+        
+        Debug.Log($"Eraser mode {(enabled ? "enabled" : "disabled")} - using brush size: {markSize}");
+    }
+
+    /// <summary>
+    /// Check if eraser mode is currently active
+    /// </summary>
+    public bool IsEraserMode()
+    {
+        return isEraserMode;
+    }
+
+    /// <summary>
+    /// Set the eraser preview color
+    /// </summary>
+    public void SetEraserPreviewColor(Color color)
+    {
+        eraserPreviewColor = color;
+        
+        // Update preview if in eraser mode and aiming at canvas
+        if (isEraserMode && isAimingAtCanvas && showPreview)
+        {
+            UpdateCanvasPreview(lastHitUV, lastHitPoint, lastHitNormal);
+        }
+    }
+
+    /// <summary>
+    /// Set the eraser preview opacity
+    /// </summary>
+    public void SetEraserPreviewOpacity(float opacity)
+    {
+        eraserPreviewOpacity = Mathf.Clamp01(opacity);
+        
+        // Update preview if in eraser mode and aiming at canvas
+        if (isEraserMode && isAimingAtCanvas && showPreview)
+        {
+            UpdateCanvasPreview(lastHitUV, lastHitPoint, lastHitNormal);
+        }
+    }
+
+    /// <summary>
+    /// Get current eraser preview color
+    /// </summary>
+    public Color GetEraserPreviewColor()
+    {
+        return eraserPreviewColor;
+    }
+
+    /// <summary>
+    /// Get current eraser preview opacity
+    /// </summary>
+    public float GetEraserPreviewOpacity()
+    {
+        return eraserPreviewOpacity;
+    }
+
+    #endregion
+
     /// <summary>
     /// Get current preview world scale for debugging
     /// </summary>
@@ -1097,6 +1222,66 @@ public class CanvasRaycast : MonoBehaviour
             Debug.Log($"Left controller: {xrModalityManager.leftController?.name}");
             Debug.Log($"Right controller: {xrModalityManager.rightController?.name}");
         }
+    }
+
+    [ContextMenu("Test Toggle Eraser Mode")]
+    public void TestToggleEraserMode()
+    {
+        ToggleEraserMode();
+    }
+
+    [ContextMenu("Test Enable Eraser Mode")]
+    public void TestEnableEraserMode()
+    {
+        SetEraserMode(true);
+    }
+
+    [ContextMenu("Test Disable Eraser Mode")]
+    public void TestDisableEraserMode()
+    {
+        SetEraserMode(false);
+    }
+
+    [ContextMenu("Debug Eraser State")]
+    public void DebugEraserState()
+    {
+        Debug.Log($"=== ERASER MODE DEBUG ===");
+        Debug.Log($"Is Eraser Mode: {isEraserMode}");
+        Debug.Log($"Current Brush Size: {markSize}");
+        Debug.Log($"Eraser Preview Color: {eraserPreviewColor}");
+        Debug.Log($"Eraser Preview Opacity: {eraserPreviewOpacity}");
+        Debug.Log($"Is Aiming At Canvas: {isAimingAtCanvas}");
+        Debug.Log($"Current Target Canvas: {(currentTargetCanvas != null ? currentTargetCanvas.gameObject.name : "None")}");
+        Debug.Log($"Show Preview: {showPreview}");
+        
+        if (isAimingAtCanvas)
+        {
+            Debug.Log($"Last Hit UV: {lastHitUV}");
+            Debug.Log($"Preview will use: {(isEraserMode ? "Eraser visuals" : "Paint visuals")}");
+        }
+    }
+
+    [ContextMenu("Test Eraser With Small Brush")]
+    public void TestEraserSmallBrush()
+    {
+        SetEraserMode(true);
+        SetPreviewSize(10f);
+        Debug.Log("Eraser enabled with small brush (size 10)");
+    }
+
+    [ContextMenu("Test Eraser With Large Brush")]
+    public void TestEraserLargeBrush()
+    {
+        SetEraserMode(true);
+        SetPreviewSize(50f);
+        Debug.Log("Eraser enabled with large brush (size 50)");
+    }
+
+    [ContextMenu("Test Paint With Current Size")]
+    public void TestPaintWithCurrentSize()
+    {
+        SetEraserMode(false);
+        Debug.Log($"Paint mode enabled with current brush size: {markSize}");
     }
 
     [ContextMenu("Set as Left Hand")]
